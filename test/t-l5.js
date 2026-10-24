@@ -58,6 +58,28 @@ console.log('\n=== L5 编排运行时门禁 ===\n');
   ok('G54f 未知意图抛异常', threw);
 }
 
+// G54f2 结构门禁：所有 planner 引用的微指令必须真实存在于 ISA
+// （曾因写了不存在的 quant.dequantize_kv 而必然抛错，t-l5 却没测到——此门禁堵住该类回归）
+{
+  const { getISA } = require('../src/l4-isa.js');
+  const valid = new Set(getISA().table.map((t) => t.name));
+  const intents = ['attn_block', 'ffn_block', 'classify', 'quantize'];
+  let dangling = [];
+  for (const it of intents) {
+    for (const s of planIntent(it, { seq: [] }).steps) {
+      if (!valid.has(s.op)) dangling.push(it + ' → ' + s.op);
+    }
+  }
+  ok('G54f2 planner 引用的微指令全部存在于 ISA', dangling.length === 0, dangling.join('; '));
+}
+
+// G54f3 quantize 意图可执行且输出有限（回归测试）
+{
+  const rt = new Runtime();
+  const { output, gates } = rt.execute('quantize', { seq: [0.1, -0.2, 0.3, 0.05] });
+  ok('G54f3 quantize 意图可执行且有限', Array.isArray(output) && output.every(Number.isFinite) && gates.invariant === 2);
+}
+
 // G54g 负面测试：不变量检查器必须抓出违例（证明门禁非空）
 {
   ok('G54g1 softmax 行和≠1 被抓出', checkInvariant('norm.softmax', [0.4, 0.3, 0.2]) !== null);

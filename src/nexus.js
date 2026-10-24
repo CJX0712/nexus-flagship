@@ -118,5 +118,7 @@ function cli(argv) {
   }
 }
 
-module.exports = { NEXUS, cli };
-if (require.main === module) cli(process.argv);
+// 一并再导出引擎层类型，便于外部注册自定义引擎（浏览器构建同样可见）
+module.exports = { NEXUS, cli, EngineAdapter, BuiltInRefEngine, ModelRegistry, Dispatch };
+// 仅在 Node CLI 直接执行时启动；打包进浏览器时 process/require.main 均不存在，必须守卫。
+if (typeof process !== 'undefined' && typeof require !== 'undefined' && require.main === module) cli(process.argv);

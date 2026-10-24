@@ -18,9 +18,20 @@ console.log('\n=== L4 微指令 ISA 门禁 (目标 1024) ===\n');
 // G52a/b/c/e：规模、家族齐整、名字唯一、全可调、全确定
 ok('G52a ISA 总数 = 1024', isa.size === 1024, `size=${isa.size}`);
 {
-  let all32 = true, bad = [];
-  for (const [fid, f] of isa.byFamily) if (f.members.length !== 32) { all32 = false; bad.push(fid); }
-  ok('G52b 每个家族恰好 32 成员', all32, bad.length ? bad.join(',') : `${isa.byFamily.size} 家族`);
+  // 注意：isa.byFamily.get(f).members 是**已构建的 32 个指令对象**，长度恒为 32 ——
+  // 拿它数家族成员是**空转门禁**。必须数 table 里每个 family 的真实条数。
+  const cnt = {};
+  for (const t of isa.table) cnt[t.family] = (cnt[t.family] || 0) + 1;
+  const bad = Object.entries(cnt).filter(([, v]) => v !== 32);
+  ok('G52b 每家族在表中恰好 32 条', bad.length === 0 && Object.keys(cnt).length === 32,
+    bad.map(([k, v]) => k + '=' + v).join(','));
+}
+{
+  const names = isa.table.map((t) => t.name);
+  // 伪指令门禁：quant 曾只有 31 个成员 → 第 32 条名字字面就是 "quant.undefined"，
+  // 而"唯一名"门禁会把它当成一个合法字符串放过。必须显式禁止。
+  const bogus = names.filter((n) => !n || n.includes('undefined') || n.includes('NaN') || n.trim() === '');
+  ok('G52c2 无伪指令（名字不含 undefined/NaN/空）', bogus.length === 0, bogus.slice(0, 5).join(','));
 }
 {
   const names = isa.table.map((t) => t.name);

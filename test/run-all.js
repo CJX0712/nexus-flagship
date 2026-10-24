@@ -9,7 +9,8 @@ const path = require('path');
 
 const NODE = process.env.NEXUS_NODE || process.execPath;
 const testDir = __dirname;
-const files = fs.readdirSync(testDir).filter((f) => /^t-l\d+\.js$/.test(f)).sort();
+// 各层门禁 + 浏览器构建门禁（t-*.js，不含 run-all 自身）
+const files = fs.readdirSync(testDir).filter((f) => /^t-.*\.js$/.test(f) && f !== 'run-all.js').sort();
 
 let totalPass = 0, totalFail = 0;
 const rows = [];

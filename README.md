@@ -32,8 +32,9 @@
 | L8 | 治理审计 | `src/nexus.js` | — | 每次调用写审计日志（引擎 / 门禁 / 耗时 / 不变量） |
 | L9 | 元编排 | `src/nexus.js` | — | 把「意图」编译为 ISA 程序并驱动运行时 |
 | **L10** | **1024 微指令集** | `src/l4-isa.js` | — | 见下；旗舰的「指令级」底座 |
+| — | 浏览器构建 | `tools/build-browser.js` → `dist/` | 12 | UMD 单文件 + 双端逐位一致性 |
 
-> 全量门禁：**202 通过 / 0 失败 · 覆盖 8 个测试层**。运行 `npm test` 即可复现。
+> 全量门禁：**217 通过 / 0 失败 · 覆盖 9 个测试层**。运行 `npm test` 即可复现。
 
 ---
 
@@ -67,12 +68,26 @@
 
 ```bash
 # 依赖：零。仅 Node ≥ 14。
-npm test                 # 全量门禁（202 项）
-node src/nexus.js isa    # 查看 1024 微指令 ISA 统计
-node src/nexus.js benchmark   # 跑 attn→ffn→classify 流水线
+npm test                        # 全量门禁（217 项，含浏览器双端一致性）
+npm run build:browser           # 生成 dist/nexus.browser.js（UMD，171 KB）
+node src/nexus.js isa           # 查看 1024 微指令 ISA 统计
+node src/nexus.js benchmark     # 跑 attn→ffn→classify 流水线
 node src/nexus.js classify "晨星旗舰AI"   # 经调度+门禁做分类
 node src/nexus.js run attn_block          # 直接执行某意图
 ```
+
+浏览器（同一份代码，双端逐位一致）：
+
+```html
+<script src="dist/nexus.browser.js"></script>
+<script>
+  const nexus = new NEXUS.NEXUS();
+  console.log(nexus.isa());          // { total: 1024, families: 32, ... }
+  nexus.classify('晨星旗舰AI');       // 经调度 + 门禁 + 审计
+</script>
+```
+
+打开 `dist/index.html` 即可看到浏览器内自检面板（ISA 家族表 / 在线分类 / 门禁计数）。
 
 在代码中使用：
 
@@ -106,8 +121,8 @@ const out = nexus.dispatch({ tokens: 'hello nexus' });
 
 ## 验证与署名
 
-- 全量门禁： **202 通过 / 0 失败**（L0–L7 + ISA 双层）。
-- 双端：Node 22 实测全绿；浏览器可直接 `import` 各 `src/*.js`（无 Node 专有 API）。
+- 全量门禁： **217 通过 / 0 失败**（L0–L7 + ISA 双层 + 浏览器构建）。
+- 双端：Node 22 实测全绿；`dist/nexus.browser.js`（UMD，171 KB）在浏览器直接可用，且**与 Node 路径逐位一致**（G57e/f/g 已锁死）。
 - 署名：**晨星 (CJX0712)**。本成果完整开源、可运行、可复现、可验证。
 
 > 旗舰闭环交付：本仓库即终点 —— 拉取即可跑、改即可验、读即可懂。

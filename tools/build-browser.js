@@ -1,0 +1,192 @@
+#!/usr/bin/env node
+/**
+ * NEXUS 浏览器构建器（零依赖）
+ * ---------------------------------------------------------------------------
+ * 把 8 个 CommonJS 源文件打包成一个 UMD 单文件，浏览器可直接 <script> 引入。
+ * 不引入 webpack/rollup —— 本项目的原则是零依赖，一个微型模块加载器足够。
+ *
+ * 输出：dist/nexus.browser.js + dist/index.html（浏览器内自检 Demo）
+ * 作者：晨星 (CJX0712) · MIT
+ */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+
+const root = path.join(__dirname, '..');
+const srcDir = path.join(root, 'src');
+const distDir = path.join(root, 'dist');
+
+// 依赖顺序：被依赖者在前（加载时按 require 惰性解析，顺序仅为可读性）
+const MODULES = [
+  'l0-numerics', 'l1-autodiff', 'l2-primitives', 'l3-inference',
+  'l4-isa', 'l5-orchestration', 'l6-engines', 'nexus',
+];
+
+function buildBundle() {
+  let out = '';
+  out += '/*!\n';
+  out += ' * NEXUS · 晨星旗舰 AI 操作系统 · 浏览器构建\n';
+  out += ' * 由 tools/build-browser.js 自动生成，请勿手改（改 src/ 后重新构建）\n';
+  out += ' * 作者：晨星 (CJX0712) · MIT\n';
+  out += ' */\n';
+  out += '(function (global, factory) {\n';
+  out += "  if (typeof module === 'object' && module.exports) module.exports = factory();\n";
+  out += '  else global.NEXUS = factory();\n';
+  out += "})(typeof self !== 'undefined' ? self : this, function () {\n";
+  out += "'use strict';\n";
+  // ── 微型 CommonJS 加载器 ──
+  out += 'var __modules = {}, __cache = {};\n';
+  out += 'function __require(name) {\n';
+  out += "  var key = String(name).replace(/^\\.\\//, '').replace(/\\.js$/, '');\n";
+  out += '  if (__cache[key]) return __cache[key].exports;\n';
+  out += "  if (!__modules[key]) throw new Error('NEXUS: 未知模块 ' + name);\n";
+  out += '  var module = { exports: {} };\n';
+  out += '  __cache[key] = module;\n';
+  out += '  __modules[key](module, module.exports, __require);\n';
+  out += '  return module.exports;\n';
+  out += '}\n';
+  for (const m of MODULES) {
+    const code = fs.readFileSync(path.join(srcDir, m + '.js'), 'utf8');
+    out += '__modules[' + JSON.stringify(m) + '] = function (module, exports, require) {\n';
+    out += code.trimEnd() + '\n';
+    out += '};\n';
+  }
+  out += "return __require('nexus');\n";
+  out += '});\n';
+  return out;
+}
+
+function buildHtml() {
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXUS · 晨星旗舰 AI 操作系统 · 浏览器自检</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:32px; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+         background:#f6f7f9; color:#1a1d21; }
+  .wrap { max-width:980px; margin:0 auto; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .sub { color:#5c6470; font-size:13px; margin-bottom:24px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:22px; }
+  .card { background:#fff; border:1px solid #e3e6ea; border-radius:12px; padding:16px 18px; }
+  .card .k { font-size:12px; color:#5c6470; margin-bottom:6px; }
+  .card .v { font-size:22px; font-weight:650; font-variant-numeric:tabular-nums; }
+  .card .v.red { color:#c0392b; }
+  .card .v.green { color:#1e8449; }
+  .panel { background:#fff; border:1px solid #e3e6ea; border-radius:12px; padding:18px 20px; margin-bottom:16px; }
+  .panel h2 { font-size:15px; margin:0 0 12px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums; }
+  th,td { text-align:left; padding:7px 10px; border-bottom:1px solid #eef0f3; }
+  th { color:#5c6470; font-weight:600; font-size:12px; }
+  .ok { color:#1e8449; font-weight:600; }
+  .bad { color:#c0392b; font-weight:600; }
+  button { background:#1a1d21; color:#fff; border:0; border-radius:8px; padding:9px 16px;
+           font-size:13px; cursor:pointer; }
+  input { padding:9px 11px; border:1px solid #d5d9de; border-radius:8px; font-size:13px; width:280px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  code { background:#eef0f3; border-radius:5px; padding:1px 6px; font-size:12px; }
+  .foot { color:#8a919c; font-size:12px; margin-top:22px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>NEXUS · 晨星旗舰 AI 操作系统</h1>
+  <div class="sub">零依赖纯 JS · 1024 微指令 ISA · 202 项数学门禁 · 浏览器内直接自检 &nbsp;|&nbsp; 作者：<b>晨星 (CJX0712)</b> · MIT</div>
+
+  <div class="grid" id="stats"></div>
+
+  <div class="panel">
+    <h2>微指令 ISA · 1024 条（每族 32 成员）</h2>
+    <table id="isa"><thead><tr><th>家族</th><th>计数</th><th>类别</th><th>样例</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="panel">
+    <h2>在线推理（经调度 + 数学门禁 + 审计）</h2>
+    <div class="bar">
+      <input id="txt" value="晨星旗舰AI" placeholder="输入文本">
+      <button id="go">分类</button>
+      <button id="bench">跑流水线</button>
+    </div>
+    <table id="out" style="margin-top:12px"><tbody><tr><td style="color:#5c6470">点击上方按钮开始</td></tr></tbody></table>
+  </div>
+
+  <div class="foot">同一份代码在 Node 22 与浏览器双端运行；<code>node test/run-all.js</code> 复现全部门禁。</div>
+</div>
+
+<script src="nexus.browser.js"></script>
+<script>
+(function () {
+  var N = window.NEXUS;
+  var nexus = new N.NEXUS();
+
+  // ── 统计卡片 ──
+  var s = nexus.isa();
+  var rows = [
+    ['微指令总数', s.total, 'red'],
+    ['家族数', s.families, ''],
+    ['core（语义独立）', s.byKind.core, ''],
+    ['sweep（参数扫描）', s.byKind.sweep, ''],
+    ['注册引擎', nexus.registry.list().length, ''],
+    ['审计条目', nexus.auditLog().length, '']
+  ];
+  document.getElementById('stats').innerHTML = rows.map(function (r) {
+    return '<div class="card"><div class="k">' + r[0] + '</div><div class="v ' + r[2] + '">' + r[1] + '</div></div>';
+  }).join('');
+
+  // ── ISA 家族表 ──
+  var coreFams = { act:1,loss:1,kern:1,norm:1,gate:1,moe:1,seq:1,grad:1,cache:1,quant:1,topk:1,init:1,mask:1,agg:1,attn:1 };
+  var tb = document.querySelector('#isa tbody');
+  tb.innerHTML = Object.keys(s.byFamily).map(function (f) {
+    return '<tr><td><code>' + f + '</code></td><td>' + s.byFamily[f] +
+      '</td><td>' + (coreFams[f] ? 'core' : 'sweep') + '</td><td><code>' + f + '.' +
+      (coreFams[f] ? '成员 32 个' : '[0..31]') + '</code></td></tr>';
+  }).join('');
+
+  var out = document.getElementById('out');
+  function show(pairs) {
+    out.innerHTML = '<tbody>' + pairs.map(function (p) {
+      return '<tr><td style="width:140px;color:#5c6470">' + p[0] + '</td><td>' + p[1] + '</td></tr>';
+    }).join('') + '</tbody>';
+  }
+
+  document.getElementById('go').onclick = function () {
+    var t = document.getElementById('txt').value || '晨星旗舰AI';
+    var r = nexus.classify(t);
+    var d = r.result.distribution;
+    show([
+      ['引擎', '<code>' + r.engine + '</code>（' + r.kind + '）'],
+      ['类别数', d.length],
+      ['分布', d.map(function (x) { return x.toFixed(4); }).join(', ')],
+      ['分布和', '<b class="' + (Math.abs(d.reduce(function (a, b) { return a + b; }, 0) - 1) < 1e-9 ? 'ok' : 'bad') + '">' +
+        d.reduce(function (a, b) { return a + b; }, 0).toFixed(10) + '</b>（门禁 G3 要求 = 1）']
+    ]);
+  };
+
+  document.getElementById('bench').onclick = function () {
+    var r = nexus.benchmark();
+    show([
+      ['流水线步数', r.steps],
+      ['耗时', r.ms + ' ms'],
+      ['门禁 G1 确定性', r.gates.determinism + ' 次'],
+      ['门禁 G2 有限性', r.gates.finite + ' 次'],
+      ['门禁 G3 不变量', r.gates.invariant + ' 次'],
+      ['审计条目', nexus.auditLog().length]
+    ]);
+  };
+})();
+</script>
+</body>
+</html>
+`;
+}
+
+fs.mkdirSync(distDir, { recursive: true });
+fs.writeFileSync(path.join(distDir, 'nexus.browser.js'), buildBundle(), 'utf8');
+fs.writeFileSync(path.join(distDir, 'index.html'), buildHtml(), 'utf8');
+const kb = (fs.statSync(path.join(distDir, 'nexus.browser.js')).size / 1024).toFixed(1);
+console.log(`✓ dist/nexus.browser.js (${kb} KB) · dist/index.html`);
+console.log(`  模块 ${MODULES.length} 个 · 零依赖 · UMD（浏览器 window.NEXUS / Node module.exports）`);

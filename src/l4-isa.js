@@ -209,7 +209,7 @@ const FAMILIES = [
       'layer_scale', 'rms_scale', 'linf_norm', 'pnorm_3', 'quantile_norm', 'rank_norm',
       'decimal_scale', 'unit_range', 'sigmoid_squash', 'tanh_squash', 'median_center',
       'mad_scale', 'unit_variance', 'double_center', 'row_softmax', 'col_softmax',
-      'sharpen', 'temperature_down', 'gumbel_softmax_like'],
+      'sharpen', 'temperature_down', 'gumbel_softmax_like', 'layer_norm'],
     make: (i, name) => ({
       name: 'norm.' + name,
       fn: (x) => {
@@ -249,6 +249,8 @@ const FAMILIES = [
           case 'sharpen': { const s = Array.from(L0.softmax(a.map((v) => v * 2))); return s; }
           case 'temperature_down': return Array.from(L0.softmax(a.map((v) => v / 0.5)));
           case 'gumbel_softmax_like': { const s = Array.from(L0.softmax(a.map((v) => (v + 0.5) / 0.7))); return s; }
+          // LayerNorm 原型：(x-μ)/√(σ²+ε) —— 最基础的归一化，此前竟缺失
+          case 'layer_norm': { const variance = sd * sd; return a.map((v) => (v - mean) / Math.sqrt(variance + 1e-5)); }
           default: return a;
         }
       },
@@ -525,7 +527,7 @@ const FAMILIES = [
       'int4_gptq_like', 'nf4', 'fp8_e4m3', 'fp8_e5m2', 'int2', 'ternary_158',
       'binary', 'rtn', 'gptq_hessian_like', 'awq_activation_aware', 'smoothquant_like',
       'llm_int8_like', 'kmeans_quant', 'log_quant', 'blockwise_8', 'blockwise_4',
-      'dynamic_per_tensor', 'static_per_tensor', 'mixed_precision', 'outlier_split'],
+      'dynamic_per_tensor', 'static_per_tensor', 'mixed_precision', 'outlier_split', 'quarot_like'],
     make: (i, name) => ({
       name: 'quant.' + name,
       fn: (x) => {
@@ -558,6 +560,19 @@ const FAMILIES = [
           case 'blockwise_4': { const out = a.slice(); for (let s = 0; s < a.length; s += 8) { const blk = a.slice(s, s + 8); const m = Math.max(...blk.map(Math.abs)) || 1; for (let k = 0; k < blk.length; k++) out[s + k] = Math.round(blk[k] / m * 7) * m / 7; } return out; }
           case 'mixed_precision': return a.map((v, k) => (Math.abs(v) > amax * 0.5 ? v : Math.round(v / amax * 127) * amax / 127));
           case 'outlier_split': return a.map((v) => (Math.abs(v) > amax * 0.95 ? v : Math.round(v / amax * 7) * amax / 7));
+          // QuaRot：4×4 Sylvester-Hadamard 旋转（消离群值）→ per-tensor int8 量化
+          case 'quarot_like': {
+            const out = a.slice();
+            for (let s = 0; s + 4 <= a.length; s += 4) {
+              const x0 = a[s], x1 = a[s + 1], x2 = a[s + 2], x3 = a[s + 3];
+              out[s] = 0.5 * (x0 + x1 + x2 + x3);
+              out[s + 1] = 0.5 * (x0 - x1 + x2 - x3);
+              out[s + 2] = 0.5 * (x0 + x1 - x2 - x3);
+              out[s + 3] = 0.5 * (x0 - x1 - x2 + x3);
+            }
+            const am = Math.max(...out.map(Math.abs)) || 1;
+            return out.map((v) => Math.round(v / am * 127) * am / 127);
+          }
           default: return q(127);
         }
       },
@@ -626,7 +641,7 @@ const FAMILIES = [
       'scaled_residual', 'truncated_normal', 'kaiming_fan_out', 'small_init',
       'zero_bias', 'one_gain', 'pos_encoding_like', 'sine_init', 'pos_embed_1d',
       'pos_embed_2d', 'rope_like', 'alibi_like', 'random_walk', 'bernoulli_05',
-      'dirichlet_like'],
+      'dirichlet_like', 'lora_b_zero'],
     make: (i, name) => ({
       name: 'init.' + name,
       fn: (x) => {
@@ -664,6 +679,8 @@ const FAMILIES = [
           case 'random_walk': { let s = 0; return k.map(() => (s += Math.sin(s * 3 + 1))); }
           case 'bernoulli_05': return k.map((v, j) => (j % 2 === 0 ? 1 : 0));
           case 'dirichlet_like': { const z = k.reduce((t, v) => t + Math.abs(Math.sin(v * 3)) + 0.1, 0); return k.map((v) => (Math.abs(Math.sin(v * 3)) + 0.1) / z); }
+          // LoRA 的 B 矩阵：全零初始化（保证训练开始时 ΔW=BA=0，真实且特定的方案）
+          case 'lora_b_zero': return new Array(n).fill(0);
           default: return new Array(n).fill(0);
         }
       },

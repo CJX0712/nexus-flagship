@@ -18,7 +18,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - name: 全量数学门禁（202 项）
+      - name: 构建浏览器产物
+        run: node tools/build-browser.js
+      - name: 全量数学门禁（217 项，含浏览器双端一致性）
         run: node test/run-all.js
       - name: 冒烟：CLI 可用
         run: |

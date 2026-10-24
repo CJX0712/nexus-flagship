@@ -6,7 +6,8 @@
   "bin": { "nexus": "src/nexus.js" },
   "scripts": {
     "test": "node test/run-all.js",
-    "selfcheck": "node src/nexus.js benchmark && node test/run-all.js",
+    "build:browser": "node tools/build-browser.js",
+    "selfcheck": "node tools/build-browser.js && node src/nexus.js benchmark && node test/run-all.js",
     "cli": "node src/nexus.js"
   },
   "author": "晨星 (CJX0712)",

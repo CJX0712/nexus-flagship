@@ -162,10 +162,12 @@ function planIntent(intent, seed) {
         output: 'dist',
       };
     case 'quantize':
+      // int8 per-channel 量化 → NF4 重量化。注意：ISA 里没有 dequantize_kv / round 成员，
+      // 曾误写 quant.dequantize_kv 与 quant.round 导致本意图必然抛错——由浏览器构建门禁抓出。
       return {
         steps: [
           { id: 1, op: 'quant.int8_per_channel', inputs: [seq], out: 'q' },
-          { id: 2, op: 'quant.dequantize_kv', inputs: ['q'], out: 'dq' },
+          { id: 2, op: 'quant.nf4', inputs: ['q'], out: 'dq' },
         ],
         output: 'dq',
       };
