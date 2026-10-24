@@ -1,0 +1,16 @@
+{
+  "name": "nexus-flagship",
+  "version": "1.0.0",
+  "description": "NEXUS · 晨星旗舰 AI 操作系统：十层架构 + 1024 微指令 ISA，零依赖纯 JS，Node/浏览器双端可运行、可复现、可验证。",
+  "main": "src/nexus.js",
+  "bin": { "nexus": "src/nexus.js" },
+  "scripts": {
+    "test": "node test/run-all.js",
+    "selfcheck": "node src/nexus.js benchmark && node test/run-all.js",
+    "cli": "node src/nexus.js"
+  },
+  "author": "晨星 (CJX0712)",
+  "license": "MIT",
+  "keywords": ["ai", "inference", "isa", "attention", "speculative-decoding", "autodiff", "numerics", "flagship"],
+  "engines": { "node": ">=14" }
+}
