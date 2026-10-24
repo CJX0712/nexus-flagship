@@ -1,0 +1,27 @@
+name: NEXUS 门禁
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18', '20', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: 全量数学门禁（202 项）
+        run: node test/run-all.js
+      - name: 冒烟：CLI 可用
+        run: |
+          node src/nexus.js isa
+          node src/nexus.js benchmark
+          node src/nexus.js classify "晨星旗舰AI"
